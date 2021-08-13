@@ -7,8 +7,10 @@ Matterials:
 -st7735 160x80 tft display
 -Small drone battery
 -3pin slide switch
--jst type connector
+-Rotary Encoder
 -HC-06 bluetooth module
+-jst type connector
+-M4*10 screw
 -Convex lens(focal length 15mm)
 -2mm thick acrylic panel
 -one way mirror film
