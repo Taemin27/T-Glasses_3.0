@@ -21,9 +21,14 @@ const uint16_t GREEN = 0x07e0;
 Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 bool timerActive = false;
-int timerHour = 59;
-int timerMinute = 59;
-int timerSecond = 59;
+int timerHour = 0;
+int timerMinute = 1;
+int timerSecond = 0;
+
+int stopWatchActive = false;
+int stopWatchHour = 0;
+int stopWatchMinute = 0;
+int stopWatchSecond = 0; 
 
 unsigned long timerCurrentMillis = 0;
 unsigned long stopWatchCurrentMillis = 0;
@@ -47,7 +52,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   fnTimer();
-  
+  fnStopWatch();
 }
 
 void uiHome() {
@@ -74,7 +79,27 @@ void fnTimer() {
         }
       }
     }
-    Serial.println(String(timerHour) + ":" + String(timerMinute) + ":" + String(timerSecond));
+    Serial.println("Timer " + String(timerHour) + ":" + String(timerMinute) + ":" + String(timerSecond));
     timerCurrentMillis = millis();
+  }
+}
+
+void fnStopWatch() {
+  if(millis() - stopWatchCurrentMillis >= 1000) {
+    if(stopWatchSecond < 59) {
+      stopWatchSecond ++;
+    } else{
+      stopWatchSecond = 0;
+      if(stopWatchMinute < 59) {
+        stopWatchMinute ++;
+      } else{
+        stopWatchMinute = 0;
+        if(stopWatchHour < 99) {
+          stopWatchHour ++;
+        }
+      }
+    }
+    Serial.println("StopWatch " + String(stopWatchHour) + ":" + String(stopWatchMinute) + ":" + String(stopWatchSecond));
+    stopWatchCurrentMillis = millis();
   }
 }
