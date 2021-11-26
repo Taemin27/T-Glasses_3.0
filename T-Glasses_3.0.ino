@@ -3,7 +3,7 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <RotaryEncoder.h>
 #include <SPI.h>
-
+#include <SoftwareSerial.h>
 #include "bitmaps.h"
 
 #define TFT_CS  10
@@ -17,6 +17,7 @@ void checkPosition() {
   encoder.tick();
 }
 
+SoftwareSerial BT(2, 3);
 
 const uint16_t BLACK = 0x0000;
 const uint16_t WHITE = 0xffff;
@@ -29,16 +30,19 @@ Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 String BTinput = "";
 
-boolean timerActive = true;
+boolean timerActive = false;
 int timerHour = 0;
 int timerMinute = 0;
-int timerSecond = 10;
+int timerSecond = 0;
+int timerSelectorValue = 0;
+boolean timerSelected = false;
 
 boolean stopWatchActive = false;
 int stopWatchHour = 0;
 int stopWatchMinute = 0;
 int stopWatchSecond = 0;
 
+boolean timeActive = false;
 int timeHour = 0;
 int timeMinute = 0;
 int timeYear = 0;
@@ -52,13 +56,16 @@ unsigned long timerPreviousMillis = 0;
 unsigned long stopWatchPreviousMillis = 0;
 
 String currentPage = "menuHome";
+String note = "Test note. ABCDEFGHIJKLMNOP";
 
 void setup() {
   Serial.begin(9600);
+  BT.begin(9600);
+
   pinMode(6, INPUT_PULLUP);
   display.initR(INITR_MINI160x80);
   display.setRotation(3);
-  display.invertDisplay(true);
+  display.invertDisplay(true); //Change this if needed
 
   attachInterrupt(digitalPinToInterrupt(PIN_IN1), checkPosition, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_IN2), checkPosition, CHANGE);
@@ -75,13 +82,18 @@ void setup() {
 }
 
 void loop() {
+  if (BT.available() > 0) {
+    BTinput = BT.readString();
+    BTinput.trim();
+  }
+
+
   static int pos = 0;
   encoder.tick();
   int newPos = encoder.getPosition() / 2;
   while (pos != newPos) { //When rotary encoder position is changed
     int dir = (int)(encoder.getDirection());
     if (dir == 1) { //If the rotary encoder is turned CW
-      Serial.println("Right");
       if (currentPage == "menuHome") {
         menuTimer();
       }
@@ -94,11 +106,34 @@ void loop() {
       else if (currentPage == "menuNote") {
         menuSettings();
       }
+
+      else if (currentPage == "fnTimer") {
+        if (timerSelected == false) {
+          timerSelectorValue ++;
+          fnTimer();
+          timerSelector(false);
+        }
+        else {
+          switch (timerSelectorValue) {
+            case 1:
+              timerHour ++;
+              timerSelector(true);
+              break;
+            case 2:
+              timerMinute ++;
+              timerSelector(true);
+              break;
+            case 3:
+              timerSecond ++;
+              timerSelector(true);
+              break;
+          }
+        }
+      }
     }
     else if (dir == -1) { //If the rotary encoder is turned CCW``
       if (currentPage == "menuTimer") {
         menuHome();
-        runTime(true);
       }
       else if (currentPage == "menuStopWatch") {
         menuTimer();
@@ -109,6 +144,30 @@ void loop() {
       else if (currentPage == "menuSettings") {
         menuNote();
       }
+
+      else if (currentPage == "fnTimer") {
+        if (timerSelected == false) {
+          timerSelectorValue --;
+          fnTimer();
+          timerSelector(false);
+        }
+        else {
+          switch (timerSelectorValue) {
+            case 1:
+              timerHour --;
+              timerSelector(true);
+              break;
+            case 2:
+              timerMinute --;
+              timerSelector(true);
+              break;
+            case 3:
+              timerSecond --;         
+              timerSelector(true);
+              break;
+          }
+        }
+      }
     }
     pos = newPos;
   }
@@ -116,14 +175,29 @@ void loop() {
   int encoderButtonValue = digitalRead(6);
   if (encoderButtonValue == LOW && encoderButton == false) {
     encoderButton = true;
-    Serial.println("Button pressed");
+    if (currentPage == "menuTimer") {
+      fnTimer();
+      timerSelector(0);
+    }
+    else if (currentPage == "fnTimer") {
+      if (timerSelectorValue == 0) {
+        menuTimer();
+      }
+      else {
+        fnTimer();
+        timerSelected = !timerSelected;
+        timerSelector(timerSelected);
+      }
+    }
 
   }
   else if (encoderButtonValue == HIGH && encoderButton == true) {
     encoderButton = false;
   }
 
-  runTime(false);
+  if (timeActive == true) {
+    runTime(false);
+  }
   if (timerActive == true) {
     runTimer();
   }
@@ -139,9 +213,24 @@ void menuHome() {
   currentPage = "menuHome";
   display.fillScreen(BLACK);
   display.drawBitmap(0, 0, ui_home, 160, 80, color);
-  display.drawCircle(30, 39, 26, color);
-  if (BTinput == "") {
+  if (note != "") {
+    display.setCursor(0, 70);
+    display.setTextSize(1);
+    display.setTextColor(color);
+    display.print("Note: " + note.substring(0, 15) + "...");
+  }
 
+  if (timeActive == false) {
+    display.setCursor(0, 20);
+    display.setTextSize(1);
+    display.setTextColor(RED);
+    display.println("No clock data");
+    display.setTextColor(color);
+    display.print("Please connect your       smartphone to sync        with current time");
+  }
+  else {
+    display.drawCircle(30, 39, 26, color);
+    runTime(true);
   }
 }
 
@@ -173,7 +262,7 @@ void runTimer() {
   unsigned long currentMillis = millis();
   if (currentMillis - timerPreviousMillis >= 1000) {
     if ((timerHour == 0) && (timerMinute == 0) && (timerSecond == 0)) {
-      if(currentPage == "menuHome") {
+      if (currentPage == "menuHome") {
         display.setCursor(0, 0);
         display.setTextSize(1);
         display.setTextColor(color, BLACK);
@@ -182,7 +271,7 @@ void runTimer() {
     }
     else if (timerSecond > 0) {
       timerSecond --;
-      if(currentPage == "menuHome") {
+      if (currentPage == "menuHome") {
         display.setCursor(0, 0);
         display.setTextSize(1);
         display.setTextColor(color, BLACK);
@@ -316,6 +405,7 @@ void runTime(boolean refresh) {
     }
     display.setCursor(63, 25);
     display.setTextSize(2);
+    display.setTextColor(color, BLACK);
     display.println(formatTime(timeHour, timeMinute, 0, false));
   }
   else {
@@ -415,6 +505,7 @@ void runTime(boolean refresh) {
         }
         display.setCursor(63, 25);
         display.setTextSize(2);
+        display.setTextColor(color, BLACK);
         display.println(formatTime(timeHour, timeMinute, 0, false));
       }
       timePreviousMillis += 60000;
@@ -422,12 +513,72 @@ void runTime(boolean refresh) {
   }
 }
 
-void homeDate() {
+void fnTimer() {
+  currentPage = "fnTimer";
+  display.fillScreen(BLACK);
+  display.setCursor(0, 0);
+  display.setTextSize(1);
+  display.setTextColor(color, BLACK);
+  display.print("<<< Set Timer");
+  display.setCursor(32, 20);
+  display.setTextSize(2);
+  display.print(formatTime(timerHour, timerMinute, timerSecond, true));
 
 }
-
-void homeNote() {
-
+void timerSelector(boolean a) {
+  if (a == true) {
+    switch (timerSelectorValue) {
+      case 0:
+        display.setCursor(0, 0);
+        display.setTextSize(1);
+        display.setTextColor(BLACK, color);
+        display.print("<<<");
+        break;
+      case 1:
+        display.setCursor(32, 20);
+        display.setTextSize(2);
+        display.setTextColor(BLACK, color);
+        display.print(formatInt(timerHour));
+        break;
+      case 2:
+        display.setCursor(68, 20);
+        display.setTextSize(2);
+        display.setTextColor(BLACK, color);
+        display.print(formatInt(timerMinute));
+        break;
+      case 3:
+        display.setCursor(104, 20);
+        display.setTextSize(2);
+        display.setTextColor(BLACK, color);
+        display.print(formatInt(timerSecond));
+        break;
+    }
+  }
+  else if (a == false) {
+    if (timerSelectorValue < 0) {
+      timerSelectorValue = 0;
+    }
+    else if (timerSelectorValue > 6) {
+      timerSelectorValue = 6;
+    }
+    switch (timerSelectorValue) {
+      case 0:
+        display.drawFastHLine(0, 8, 17, color);
+        break;
+      case 1:
+        display.drawFastHLine(32, 36, 22, color);
+        display.drawFastHLine(32, 37, 22, color);
+        break;
+      case 2:
+        display.drawFastHLine(68, 36, 22, color);
+        display.drawFastHLine(68, 37, 22, color);
+        break;
+      case 3:
+        display.drawFastHLine(104, 36, 22, color);
+        display.drawFastHLine(104, 37, 22, color);
+        break;
+    }
+  }
 }
 
 void splitData(String string) {
@@ -458,4 +609,12 @@ String formatTime(int hour, int minute, int second, boolean useSecond) {
     return sHour + ":" + sMinute + ":" + sSecond;
   }
   return "error";
+}
+
+String formatInt(int i) {
+  String stringI = String(i);
+  if (stringI.length() == 1) {
+    stringI = "0" + stringI;
+  }
+  return stringI;
 }
