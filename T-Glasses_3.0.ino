@@ -117,14 +117,29 @@ void loop() {
           switch (timerSelectorValue) {
             case 1:
               timerHour ++;
+              if (timerHour > 99) {
+                timerHour = 99;
+              }
               timerSelector(true);
               break;
             case 2:
               timerMinute ++;
+              if (timerMinute > 59) {
+                timerMinute = 59;
+              }
+              else if (timerMinute < 0) {
+                timerMinute = 0;
+              }
               timerSelector(true);
               break;
             case 3:
               timerSecond ++;
+              if (timerSecond > 59) {
+                timerSecond = 59;
+              }
+              else if (timerSecond < 0) {
+                timerSecond = 0;
+              }
               timerSelector(true);
               break;
           }
@@ -155,14 +170,23 @@ void loop() {
           switch (timerSelectorValue) {
             case 1:
               timerHour --;
+              if (timerHour < 0) {
+                timerHour = 0;
+              }
               timerSelector(true);
               break;
             case 2:
               timerMinute --;
+              if (timerMinute < 0) {
+                timerMinute = 0;
+              }
               timerSelector(true);
               break;
             case 3:
-              timerSecond --;         
+              timerSecond --;
+              if (timerSecond < 0) {
+                timerSecond = 0;
+              }
               timerSelector(true);
               break;
           }
@@ -182,6 +206,10 @@ void loop() {
     else if (currentPage == "fnTimer") {
       if (timerSelectorValue == 0) {
         menuTimer();
+      }
+      else if (timerSelectorValue == 4) {
+        timerPreviousMillis = millis();
+        timerActive = !timerActive;
       }
       else {
         fnTimer();
@@ -262,33 +290,37 @@ void runTimer() {
   unsigned long currentMillis = millis();
   if (currentMillis - timerPreviousMillis >= 1000) {
     if ((timerHour == 0) && (timerMinute == 0) && (timerSecond == 0)) {
-      if (currentPage == "menuHome") {
-        display.setCursor(0, 0);
-        display.setTextSize(1);
-        display.setTextColor(color, BLACK);
-        display.print("Timer: OFF     ");
-      }
-    }
-    else if (timerSecond > 0) {
-      timerSecond --;
-      if (currentPage == "menuHome") {
-        display.setCursor(0, 0);
-        display.setTextSize(1);
-        display.setTextColor(color, BLACK);
-        display.print("Timer: " + formatTime(timerHour, timerMinute, timerSecond, true));
-      }
+      timerActive = false;
     } else {
-      timerSecond = 59;
-      if (timerMinute > 0) {
-        timerMinute --;
-
+      if (timerSecond > 0) {
+        timerSecond --;
       } else {
-        timerMinute = 59;
-        if (timerHour > 0) {
-          timerHour --;
+        timerSecond = 59;
+        if (timerMinute > 0) {
+          timerMinute --;
+        } else {
+          timerMinute = 59;
+          if (timerHour > 0) {
+            timerHour --;
+          }
         }
       }
     }
+    if (currentPage == "menuHome") {
+      display.setCursor(0, 0);
+      display.setTextSize(1);
+      display.setTextColor(color, BLACK);
+      display.print("Timer: " + formatTime(timerHour, timerMinute, timerSecond, true));
+    }
+    else if (currentPage == "fnTimer") {
+      display.setTextColor(color, BLACK);
+      display.setCursor(32, 20);
+      display.setTextSize(2);
+      display.print(formatTime(timerHour, timerMinute, timerSecond, true));
+      timerSelector(timerSelected);
+    }
+
+
     timerPreviousMillis += 1000;
   }
 }
@@ -523,6 +555,9 @@ void fnTimer() {
   display.setCursor(32, 20);
   display.setTextSize(2);
   display.print(formatTime(timerHour, timerMinute, timerSecond, true));
+  display.setCursor(50, 50);
+  display.setTextSize(1);
+  display.print("Start/Stop");
 
 }
 void timerSelector(boolean a) {
@@ -558,8 +593,8 @@ void timerSelector(boolean a) {
     if (timerSelectorValue < 0) {
       timerSelectorValue = 0;
     }
-    else if (timerSelectorValue > 6) {
-      timerSelectorValue = 6;
+    else if (timerSelectorValue > 4) {
+      timerSelectorValue = 4;
     }
     switch (timerSelectorValue) {
       case 0:
@@ -577,6 +612,8 @@ void timerSelector(boolean a) {
         display.drawFastHLine(104, 36, 22, color);
         display.drawFastHLine(104, 37, 22, color);
         break;
+      case 4:
+        display.drawFastHLine(50, 58, 59, color);
     }
   }
 }
