@@ -21,7 +21,7 @@ void checkPosition() {
   encoder.tick();
 }
 
-SoftwareSerial BT(2, 3);
+SoftwareSerial BT(0, 1);
 
 const uint16_t BLACK = 0x0000;
 const uint16_t WHITE = 0xffff;
@@ -33,6 +33,8 @@ const uint16_t color = WHITE;
 Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 String BTinput = "";
+int BTState = 0;
+int lastBTState = 0;
 
 //Timer Variables
 boolean timerActive = false;
@@ -53,9 +55,9 @@ int stopWatchSelectorValue = 0;
 boolean timeActive = false;
 int timeHour = 0;
 int timeMinute = 0;
-int timeYear = 0;
-int timeMonth = 0;
-int timeDay = 0;
+String timeYear = 0;
+String timeMonth = 0;
+String timeDay = 0;
 
 int encoderButton = 0;
 
@@ -72,7 +74,9 @@ void setup() {
   Serial.begin(9600);
   BT.begin(9600);
 
-  pinMode(6, INPUT_PULLUP);
+  pinMode(6, INPUT_PULLUP); //Encoder Button
+  pinMode(2, INPUT_PULLUP); //HC-05 State Pin
+
   display.initR(INITR_MINI160x80);
   display.setRotation(3); //Change the number if needed
   display.invertDisplay(true); //Change this to false if needed
@@ -97,15 +101,16 @@ void loop() {
     BTinput.trim();
     splitData(BTinput);
     timeActive = true;
+    menuHome();
   }
 
 
   static int pos = 0;
   encoder.tick();
-  
+
   int newPos = encoder.getPosition() / 1; //Change the divisor depending on your encoder model(Typically 1 or 2 will work)
 
-  
+
   while (pos != newPos) { //When rotary encoder position is changed
     int dir = (int)(encoder.getDirection()); //The direction of rotation
     if (dir == 1) { //If the rotary encoder is turned CW
@@ -160,7 +165,7 @@ void loop() {
           }
         }
       }
-      else if(currentPage == "fnStopWatch") {
+      else if (currentPage == "fnStopWatch") {
         stopWatchSelectorValue ++;
         fnStopWatch();
         stopWatchSelector();
@@ -212,7 +217,7 @@ void loop() {
           }
         }
       }
-      else if(currentPage == "fnStopWatch") {
+      else if (currentPage == "fnStopWatch") {
         stopWatchSelectorValue --;
         fnStopWatch();
         stopWatchSelector();
@@ -225,7 +230,7 @@ void loop() {
   if (encoderButton == LOW) {
     unsigned long buttonCurrentMillis = millis();
     if (buttonCurrentMillis - buttonPreviousMillis >= 300) {
-      
+
       if (currentPage == "menuTimer") {
         fnTimer();
         timerSelector(0);
@@ -244,12 +249,12 @@ void loop() {
           timerSelector(timerSelected);
         }
       }
-      else if(currentPage == "menuStopWatch") {
+      else if (currentPage == "menuStopWatch") {
         fnStopWatch();
         stopWatchSelector();
       }
-      else if(currentPage == "fnStopWatch") {
-        switch(stopWatchSelectorValue) {
+      else if (currentPage == "fnStopWatch") {
+        switch (stopWatchSelectorValue) {
           case 0:
             menuStopWatch();
             break;
@@ -273,6 +278,22 @@ void loop() {
 
   if (timeActive == true) { //Shows the current time only when it's active
     runTime(false);
+    if (currentPage == "menuHome") {
+      BTState = digitalRead(2);
+      if(BTState != lastBTState) {
+        display.setCursor(63, 48);
+        display.setTextSize(1);
+        if (BTState == 1) {
+          display.setTextColor(GREEN, BLACK);
+          display.println("Connected   ");
+        }
+        else if (BTState == 0) {
+          display.setTextColor(RED, BLACK);
+          display.println("Disconnected");
+        }
+        lastBTState = BTState;
+      }
+    }
   }
   if (timerActive == true) { //Shows the running timer only when it's active
     runTimer();
@@ -306,6 +327,10 @@ void menuHome() { //Home page UI
   }
   else { //When current time is synced
     display.drawCircle(30, 39, 26, color); //Outline of the analog clock
+    display.setCursor(63, 39);
+    display.setTextSize(1);
+    display.setTextColor(color, BLACK);
+    display.println(timeYear + "/" + timeMonth + "/" + timeDay);
     runTime(true); //Hands and digital clock
   }
 }
@@ -389,7 +414,7 @@ void runStopWatch() { //Runs stop watch in background
         }
       }
     }
-    if(currentPage == "fnStopWatch") {
+    if (currentPage == "fnStopWatch") {
       display.setTextColor(color, BLACK);
       display.setCursor(32, 20);
       display.setTextSize(2);
@@ -483,10 +508,20 @@ void runTime(boolean refresh) { //Runs current time in background
         break;
 
     }
-    display.setCursor(63, 25);
+    display.setCursor(63, 22);
     display.setTextSize(2);
     display.setTextColor(color, BLACK);
     display.println(formatTime(timeHour, timeMinute, 0, false)); //Digital clock next to the analog clock
+    display.setCursor(63, 48);
+    display.setTextSize(1);
+    if (digitalRead(2) == 1) {
+      display.setTextColor(GREEN);
+      display.println("Connected   ");
+    }
+    else if (digitalRead(2) == 0) {
+      display.setTextColor(RED);
+      display.println("Disconnected");
+    }
   }
   else {
     unsigned long currentMillis = millis();
@@ -583,10 +618,13 @@ void runTime(boolean refresh) { //Runs current time in background
             break;
 
         }
-        display.setCursor(63, 25);
+        display.setCursor(63, 22);
         display.setTextSize(2);
         display.setTextColor(color, BLACK);
         display.println(formatTime(timeHour, timeMinute, 0, false)); //Digital clock
+
+
+
       }
       timePreviousMillis += 60000; //Millis sync(even if it falls behind it catched up on the next second)
     }
@@ -667,27 +705,27 @@ void timerSelector(boolean a) { //Shows selector bar
 }
 
 void fnStopWatch() {
- currentPage = "fnStopWatch";
- display.fillScreen(BLACK);
- display.setCursor(0, 0);
- display.setTextSize(1);
- display.setTextColor(color, BLACK);
- display.print("<<< StopWatch");
- display.setCursor(32, 20);
- display.setTextSize(2);
- display.print(formatTime(stopWatchHour, stopWatchMinute, stopWatchSecond, true));
- display.setCursor(39, 50);
- display.setTextSize(1);
- display.print("Start/Stop  Reset");
+  currentPage = "fnStopWatch";
+  display.fillScreen(BLACK);
+  display.setCursor(0, 0);
+  display.setTextSize(1);
+  display.setTextColor(color, BLACK);
+  display.print("<<< StopWatch");
+  display.setCursor(32, 20);
+  display.setTextSize(2);
+  display.print(formatTime(stopWatchHour, stopWatchMinute, stopWatchSecond, true));
+  display.setCursor(39, 50);
+  display.setTextSize(1);
+  display.print("Start/Stop  Reset");
 }
 void stopWatchSelector() {
-  if(stopWatchSelectorValue < 0) {
+  if (stopWatchSelectorValue < 0) {
     stopWatchSelectorValue = 0;
   }
-  else if(stopWatchSelectorValue > 2) {
+  else if (stopWatchSelectorValue > 2) {
     stopWatchSelectorValue = 2;
   }
-  switch(stopWatchSelectorValue) {
+  switch (stopWatchSelectorValue) {
     case 0:
       display.drawFastHLine(0, 8, 17, color);
       break;
@@ -701,10 +739,10 @@ void stopWatchSelector() {
 
 void splitData(String string) { //Splits the bluetooth data into five independent variables
   timeHour = string.substring(0, 2).toInt();
-  timeMinute = string.substring(3, 5).toInt();;
-  timeYear = string.substring(6, 10).toInt();;
-  timeMonth = string.substring(11, 13).toInt();;
-  timeDay = string.substring(14, 16).toInt();;
+  timeMinute = string.substring(2, 4).toInt();;
+  timeYear = string.substring(4, 8);
+  timeMonth = string.substring(8, 10);
+  timeDay = string.substring(10, 12);
 }
 
 String formatTime(int hour, int minute, int second, boolean useSecond) { //Turns int into time-formatted String, adding an extra 0 at the front if the length is 1
