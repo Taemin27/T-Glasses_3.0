@@ -29,8 +29,12 @@ const uint16_t BLUE = 0x001f;
 const uint16_t RED = 0xf800;
 const uint16_t YELLOW = 0xffe0;
 const uint16_t GREEN = 0x07e0;
-const uint16_t color = WHITE;
+
 Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+//User Settings Variables
+const uint16_t color = WHITE;
+int iconShowTime = 1000;
 
 String BTinput = "";
 int BTState = 0;
@@ -58,6 +62,7 @@ int timeMinute = 0;
 String timeYear = 0;
 String timeMonth = 0;
 String timeDay = 0;
+int AMPM = 0;
 
 int encoderButton = 0;
 
@@ -66,6 +71,7 @@ unsigned long timePreviousMillis = 0;
 unsigned long timerPreviousMillis = 0;
 unsigned long stopWatchPreviousMillis = 0;
 unsigned long buttonPreviousMillis = 0;
+unsigned long iconPreviousMillis = 0;
 
 String currentPage = "menuHome"; //Labels the current page name
 String note = ""; //Stored the note
@@ -99,16 +105,27 @@ void loop() {
   if (BT.available() > 0) { //Reads any bluetooth data and saves into a string
     BTinput = BT.readString();
     BTinput.trim();
+    
     splitData(BTinput);
-    timeActive = true;
-    menuHome();
+    if(currentPage == "menuHome") {
+      if(BTinput == "message") {
+        
+      }
+      if(BTinput == "call") {
+      
+      }
+      menuHome();
+    }
+    if(timeActive == false) {
+      timeActive = true;
+    }
   }
 
 
   static int pos = 0;
   encoder.tick();
 
-  int newPos = encoder.getPosition() / 1; //Change the divisor depending on your encoder model(Typically 1 or 2 will work)
+  int newPos = encoder.getPosition() / 2; //Change the divisor depending on your encoder model(Typically 1 or 2 will work)
 
 
   while (pos != newPos) { //When rotary encoder position is changed
@@ -534,6 +551,7 @@ void runTime(boolean refresh) { //Runs current time in background
           timeHour ++;
         } else {
           timeHour = 1;
+          //ADD DATE CALCULATION LATER!!!!!!!!!!!
         }
       }
       if (currentPage == "menuHome") { //NOT for refreshing. Actually shows the hands and digital clock
@@ -737,12 +755,29 @@ void stopWatchSelector() {
   }
 }
 
+void icon(String a) {
+  if(a == "message") {
+    drawBitmap(145, 0, notification, 14, 14, YELLOW);
+  }
+  else if(a == "call") {
+    drawBitmap(145, 0, call, 14, 14, GREEN);
+  }
+  
+  unsigned long iconCurrentMillis = millis();
+  if(iconCurrentMillis - iconPreviousMillis() >= iconShowTime) {
+    if(a == "message") {
+      
+    }
+  }
+}
+
 void splitData(String string) { //Splits the bluetooth data into five independent variables
   timeHour = string.substring(0, 2).toInt();
   timeMinute = string.substring(2, 4).toInt();;
   timeYear = string.substring(4, 8);
   timeMonth = string.substring(8, 10);
   timeDay = string.substring(10, 12);
+  
 }
 
 String formatTime(int hour, int minute, int second, boolean useSecond) { //Turns int into time-formatted String, adding an extra 0 at the front if the length is 1
