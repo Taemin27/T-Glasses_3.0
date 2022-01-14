@@ -34,7 +34,7 @@ Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 //User Settings Variables
 const uint16_t color = WHITE;
-int iconShowTime = 1000;
+unsigned long iconShowTime = 1000;
 
 String BTinput = "";
 int BTState = 0;
@@ -73,6 +73,8 @@ unsigned long stopWatchPreviousMillis = 0;
 unsigned long buttonPreviousMillis = 0;
 unsigned long iconPreviousMillis = 0;
 
+int iconState = 0; //0:None  1:Message  2:Call
+
 String currentPage = "menuHome"; //Labels the current page name
 String note = ""; //Stored the note
 
@@ -103,18 +105,24 @@ void setup() {
 
 void loop() {
   if (BT.available() > 0) { //Reads any bluetooth data and saves into a string
+    BTinput = "";
     BTinput = BT.readString();
     BTinput.trim();
     
-    splitData(BTinput);
+    
     if(currentPage == "menuHome") {
+      timeActive = true;
+      menuHome();
       if(BTinput == "message") {
-        
+        iconPreviousMillis = millis();
+        iconState = 1;
       }
       if(BTinput == "call") {
-      
+        iconPreviousMillis = millis();
+        iconState = 2;
       }
-      menuHome();
+      splitData(BTinput);
+      
     }
     if(timeActive == false) {
       timeActive = true;
@@ -318,7 +326,12 @@ void loop() {
   if (stopWatchActive == true) { //Shows the running stop watch only when it's active
     runStopWatch();
   }
-
+  if (iconState == 1) {
+     icon("message");
+  }
+  if(iconState == 2) {
+    icon("call");
+  }
 
 
 }
@@ -756,17 +769,19 @@ void stopWatchSelector() {
 }
 
 void icon(String a) {
-  if(a == "message") {
-    drawBitmap(145, 0, notification, 14, 14, YELLOW);
-  }
-  else if(a == "call") {
-    drawBitmap(145, 0, call, 14, 14, GREEN);
-  }
-  
-  unsigned long iconCurrentMillis = millis();
-  if(iconCurrentMillis - iconPreviousMillis() >= iconShowTime) {
+  if(iconState == 0) {
     if(a == "message") {
-      
+      display.drawBitmap(145, 0, notification, 14, 14, YELLOW);
+    }
+    else if(a == "call") {
+      display.drawBitmap(145, 0, call, 14, 14, GREEN);
+    }
+  }
+  else {
+    unsigned long iconCurrentMillis = millis();
+    if(iconCurrentMillis - iconPreviousMillis >= iconShowTime) {
+        display.fillRect(145, 0, 14, 14, BLACK);
+        iconState = 0;
     }
   }
 }
