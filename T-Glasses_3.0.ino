@@ -34,7 +34,7 @@ Adafruit_ST7735 display = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 //User Settings Variables
 const uint16_t color = WHITE;
-unsigned long iconShowTime = 1000;
+unsigned long iconShowTime = 5000;
 
 String BTinput = "";
 int BTState = 0;
@@ -73,7 +73,9 @@ unsigned long stopWatchPreviousMillis = 0;
 unsigned long buttonPreviousMillis = 0;
 unsigned long iconPreviousMillis = 0;
 
-int iconState = 0; //0:None  1:Message  2:Call
+boolean iconMessage = false;
+boolean iconCall = false;
+int iconState = 0; //0: None, 1: Icon needs to be printed, 2: Icon is printed
 
 String currentPage = "menuHome"; //Labels the current page name
 String note = ""; //Stored the note
@@ -108,25 +110,28 @@ void loop() {
     BTinput = "";
     BTinput = BT.readString();
     BTinput.trim();
-    
-    
-    if(currentPage == "menuHome") {
-      timeActive = true;
-      menuHome();
-      if(BTinput == "message") {
-        iconPreviousMillis = millis();
-        iconState = 1;
-      }
-      if(BTinput == "call") {
-        iconPreviousMillis = millis();
-        iconState = 2;
-      }
-      splitData(BTinput);
+    if(BTinput == "message") {
+      iconMessage = true;
+      iconPreviousMillis = millis();
+      iconState = 1;
+    }
+    else if(BTinput == "call") {
+      iconCall = true;
+      iconState = 1;
+    }
+    else if(BTinput == "callend") {
+      iconCall = false;
+      iconState = 1;
+    }
+    else if(BTinput.substring(0, 2) == "n:") {
       
     }
-    if(timeActive == false) {
+    else {
+      splitData(BTinput);
       timeActive = true;
+      menuHome();
     }
+    BTinput = "";
   }
 
 
@@ -326,12 +331,10 @@ void loop() {
   if (stopWatchActive == true) { //Shows the running stop watch only when it's active
     runStopWatch();
   }
-  if (iconState == 1) {
-     icon("message");
+  if (iconState != 0) {
+    icon();
   }
-  if(iconState == 2) {
-    icon("call");
-  }
+  
 
 
 }
@@ -768,20 +771,45 @@ void stopWatchSelector() {
   }
 }
 
-void icon(String a) {
-  if(iconState == 0) {
-    if(a == "message") {
-      display.drawBitmap(145, 0, notification, 14, 14, YELLOW);
+void icon() {
+  if(iconState == 1) {
+    if(iconMessage == true) {
+      display.fillRect(140, 5, 14, 14, BLACK);
+      display.drawBitmap(140, 5, notification, 14, 14, YELLOW);
+      Serial.println("Message");
+      iconState = 2;
     }
-    else if(a == "call") {
-      display.drawBitmap(145, 0, call, 14, 14, GREEN);
+    else if(iconCall == true) {
+      if(iconMessage == false) {
+        display.fillRect(140, 5, 14, 14, BLACK);
+        display.drawBitmap(140, 5, call, 14, 14, GREEN);
+        Serial.println("Call");
+        iconState = 2;
+      }
+    }
+    else if(iconCall == false) {
+      display.fillRect(140, 5, 14, 14, BLACK);
+      Serial.println("Callend");
+      iconState = 0;
     }
   }
-  else {
-    unsigned long iconCurrentMillis = millis();
-    if(iconCurrentMillis - iconPreviousMillis >= iconShowTime) {
-        display.fillRect(145, 0, 14, 14, BLACK);
+  if(iconMessage == true) {
+    unsigned long currentMillis = millis();
+    if(currentMillis - iconPreviousMillis >= iconShowTime) {
+      if(iconCall == true) {
+        display.fillRect(140, 5, 14, 14, BLACK);
+        display.drawBitmap(140, 5, call, 14, 14, GREEN);
+        Serial.println("Message End, Call");
+        iconState = 2;
+      }
+      else if(iconCall == false) {
+        display.fillRect(140, 5, 14, 14, BLACK);
+        Serial.println("Message End");
+        
         iconState = 0;
+      }
+      iconMessage = false;
+      iconPreviousMillis += iconShowTime;
     }
   }
 }
